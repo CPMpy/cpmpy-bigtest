@@ -20,11 +20,14 @@ def lists_to_conjunction(cons):
 
 
 def metamorphic_test(dirname, solver, iters):
-    mm_mutators = [metamorphic_negation]
+    mm_mutators = [xor_morph,and_morph,or_morph,implies_morph,not_morph]
+    mm_mutators = [not_morph]
+    #mm_mutators = [metamorphic_negation,newvar_xor]
 
     # choose a random model
     fmodels = glob.glob(join(dirname, "*.bt"))
     f = random.choice(fmodels)
+    #f = "models\\cp_explanations16650512278054872.bt" has no constraints
     with open(f, 'rb') as fpcl:
         cons = pickle.loads(brotli.decompress(fpcl.read())).constraints
         assert (len(cons)>0), f"{f} has no constraints"
@@ -51,11 +54,14 @@ def metamorphic_test(dirname, solver, iters):
                 return True
             else:
                 print('X', end='', flush=True)
+                print('lastmorph: ', m)
         except Exception as e:
             print('E', end='', flush=True)
             print(e)
 
         # if you got here, the model failed...
+        with open("lasterrormodel", "wb") as f:
+            pickle.dump(model, file=f)
         print(model)
         # save it etc...
 
@@ -82,6 +88,65 @@ def metamorphic_negation(cons):
     cons.append(negnegcon)
     return cons
 
+'''TRUTH TABLE BASED MORPHS'''
+def not_morph(cons):
+    con = ~random.choice(cons)
+    cons.append(~con)
+    return cons
+def xor_morph(cons):
+    '''morph two constraints with XOR'''
+    # choose constraints
+    con1, con2 = random.choices(cons, k=2)
+    #add a random option as per xor truth table
+    cons.append(random.choice((
+        Xor([con1, ~con2]),
+        Xor([~con1, con2]),
+        ~Xor([~con1, ~con2]),
+        ~Xor([con1, con2]))))
+    return cons
+
+def and_morph(cons):
+    '''morph two constraints with AND'''
+    # choose constraints
+    con1, con2 = random.choices(cons, k=2)
+    cons.append(random.choice((
+        ~((con1) & (~con2)),
+        ~((~con1) & (~con2)),
+        ~((~con1) & (con2)),
+        ((con1) & (con2)))))
+    return cons
+
+def or_morph(cons):
+    '''morph two constraints with OR'''
+    # choose constraints
+    con1, con2 = random.choices(cons, k=2)
+    #add all options as per xor truth table
+    cons.append(random.choice((
+        ((con1) | (~con2)),
+        ~((~con1) | (~con2)),
+        ((~con1) | (con2)),
+        ((con1) | (con2)))))
+    return cons
+
+def implies_morph(cons):
+    '''morph two constraints with ->'''
+    # choose constraints
+    con1, con2 = random.choices(cons, k=2)
+    #add all options as per xor truth table
+    cons.append(random.choice((
+        ~((con1).implies(~con2)),
+        ((~con1).implies(~con2)),
+        ((~con1).implies(con2)),
+        ((con1).implies(con2)))))
+    return cons
+
+'''CPMPY-TRANSFORMATION MORPHS'''
+
+def flatten_morph(cons):
+    randcons = random.choices(cons, k=len(cons))
+    flatcons = flatten_constraint(randcons)
+    return cons + flatcons
+
 
 
 if __name__ == '__main__':
@@ -89,6 +154,11 @@ if __name__ == '__main__':
     solver = "ortools"
     iters = 5 # number of metamorphic mutations per model
 
+    f = 'lasterrormodel'
+    with open(f, 'rb') as fpcl:
+        modle = pickle.loads(fpcl.read())
+        f = modle.solve()
     sat = True
     while sat:
+        pass
         sat = metamorphic_test(dirname, solver, iters)
