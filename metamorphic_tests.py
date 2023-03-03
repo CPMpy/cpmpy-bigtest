@@ -46,6 +46,8 @@ def metamorphic_test(dirname, solver, iters):
             try:
                 if arity == 0: #random number of constraints
                     randcons = random.choices(cons,k=len(cons))
+                elif arity == 1:
+                    randcons = random.choice(cons)
                 else:
                     randcons = random.choices(cons,k=arity)
                 cons += m(randcons)  # apply a metamorphic mutation
@@ -85,7 +87,7 @@ def metamorphic_test(dirname, solver, iters):
 
 '''TRUTH TABLE BASED MORPHS'''
 def not_morph(con):
-    ncon = ~random.choice(con)
+    ncon = ~con
     return [~ncon]
 def xor_morph(cons):
     '''morph two constraints with XOR'''
@@ -141,12 +143,12 @@ def only_numexpr_equality_morph(randcons,supported=frozenset()):
 
 def normalized_boolexpr_morph(randcon):
     con, newcons = normalized_boolexpr(randcon)
-    return newcons.append(con)
+    return newcons + [con]
 
 def normalized_numexpr_morph(randcon):
     #TODO should call this on subexpressions, so it's actually called on numexpressions as well
     con, newcons = normalized_numexpr(randcon)
-    return newcons.append(con)
+    return newcons +[con]
 
 def negated_normal_morph(con):
     return [~negated_normal(con)]
