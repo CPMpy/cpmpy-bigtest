@@ -23,14 +23,15 @@ def lists_to_conjunction(cons):
 
 
 def metamorphic_test(dirname, solver, iters):
-    mm_mutators = [xor_morph,and_morph,or_morph,implies_morph,not_morph]
-    mm_mutators = [negated_normal_morph]
-    mm_mutators = [linearize_constraint_morph]
+    #list of mutators and the amount of constraints they accept.
+    mm_mutators = [(xor_morph,2),(and_morph,2),(or_morph,2),(implies_morph,2),(not_morph,1)]
+    mm_mutators = [(negated_normal_morph,1)]
+    mm_mutators = [(linearize_constraint_morph,0)]
+    enb = 0
 
     # choose a random model
     fmodels = glob.glob(join(dirname, "*.bt"))
     f = random.choice(fmodels)
-    #f = "models\\cp_explanations16650512278054872.bt" has no constraints
     with open(f, 'rb') as fpcl:
         cons = pickle.loads(brotli.decompress(fpcl.read())).constraints
         assert (len(cons)>0), f"{f} has no constraints"
@@ -40,8 +41,20 @@ def metamorphic_test(dirname, solver, iters):
 
         for i in range(iters):
             # choose a metamorphic mutation
-            m = random.choice(mm_mutators)
-            cons = m(cons)  # apply a metamorphic mutation, can change cons inplace
+            m, arity = random.choice(mm_mutators)
+            # an error can occur in the transformations, so even before the solve call.
+            # log function and arguments in that case
+            try:
+                if arity == 0: #random number of constraints
+                    randcons = random.choices(cons,k=len(cons))
+                else:
+                    randcons = random.choices(cons,k=arity)
+                cons += m(randcons)  # apply a metamorphic mutation
+            except Exception as args:
+                enb += 1
+                with open("internalfunctioncrash"+str(enb), "wb") as f:
+                    pickle.dump([m, randcons], file=f) #log function and arguments that caused exception
+
 
         # enough mutations, time for solving
         try:
@@ -92,14 +105,13 @@ def metamorphic_negation(cons):
     return cons
 
 '''TRUTH TABLE BASED MORPHS'''
-def not_morph(cons):
-    con = ~random.choice(cons)
-    cons.append(~con)
-    return cons
+def not_morph(con):
+    ncon = ~random.choice(con)
+    return ~ncon
 def xor_morph(cons):
     '''morph two constraints with XOR'''
     # choose constraints
-    con1, con2 = random.choices(cons, k=2)
+    con1, con2 = cons
     #add a random option as per xor truth table
     cons.append(random.choice((
         Xor([con1, ~con2]),
@@ -136,38 +148,28 @@ def implies_morph(cons):
     # choose constraints
     con1, con2 = random.choices(cons, k=2)
     #add all options as per xor truth table
-    cons.append(random.choice((
+    return random.choice((
         ~((con1).implies(~con2)),
         ((~con1).implies(~con2)),
         ((~con1).implies(con2)),
-        ((con1).implies(con2)))))
-    return cons
+        ((con1).implies(con2))))
 
 '''CPMPY-TRANSFORMATION MORPHS'''
 
-def flatten_morph(cons):
-    randcons = random.choices(cons, k=len(cons))
 
-    try:
+def flatten_morph(randcons):
         flatcons = flatten_constraint(randcons)
-        return cons + flatcons
-    except Exception:
-        print("flatten_constraint crashed with input:", randcons)
-        return cons
+        return flatcons
 
-def only_numexpr_equality_morph(cons,supported=frozenset()):
-    randcons = random.choices(cons, k=len(cons))
+
+def only_numexpr_equality_morph(randcons,supported=frozenset()):
     newcons = only_numexpr_equality(randcons, supported=supported)
-    return cons + newcons
+    return newcons
 
 
-def normalized_boolexpr_morph(cons):
-    randcon = random.choice(cons)
-    lastSelectedConstraints = [randcon]
+def normalized_boolexpr_morph(randcon):
     con, newcons = normalized_boolexpr(randcon)
-    cons.append(con)
-    cons.extend(newcons)
-    return cons
+    return newcons.append(con)
 
 def normalized_numexpr_morph(cons):
     #TODO should call this on subexpressions, so it's actually called on numexpressions as well
@@ -178,23 +180,14 @@ def normalized_numexpr_morph(cons):
     cons.extend(newcons)
     return cons
 
-def negated_normal_morph(cons):
-    randcon = random.choice(cons)
-    try:
-        cons.append(~negated_normal(randcon))
-        return cons
-    except Exception:
-        print("negated_normal crashed with input:", randcon)
-        with open("internalfunctioncrash", "wb") as f:
-            pickle.dump([negated_normal, randcon], file=f)
-        return [BoolVal(False)] #to make sure we know something went wrong
+def negated_normal_morph(con):
+    return [~negated_normal(con)]
 
 def linearize_constraint_morph(cons):
-    randcons = random.choices(cons, k=len(cons))
     #only apply linearize after flattening
-    flatcons = flatten_constraint(randcons)
+    flatcons = flatten_constraint(cons)
     lincons = linearize_constraint(flatcons)
-    return cons + lincons
+    return lincons
 
 
 if __name__ == '__main__':
