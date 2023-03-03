@@ -7,9 +7,12 @@ from os.path import join
 import argparse
 import random
 
+from cpmpy.transformations.linearize import linearize_constraint
+
 from cpmpy import *
 from cpmpy.expressions.utils import is_any_list
-from cpmpy.transformations.flatten_model import flatten_constraint
+from cpmpy.transformations.flatten_model import flatten_constraint, normalized_boolexpr, normalized_numexpr, \
+    negated_normal
 from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from cpmpy.transformations.comparison import only_numexpr_equality
 
@@ -21,8 +24,8 @@ def lists_to_conjunction(cons):
 
 def metamorphic_test(dirname, solver, iters):
     mm_mutators = [xor_morph,and_morph,or_morph,implies_morph,not_morph]
-    mm_mutators = [not_morph]
-    #mm_mutators = [metamorphic_negation,newvar_xor]
+    mm_mutators = [negated_normal_morph]
+    mm_mutators = [linearize_constraint_morph]
 
     # choose a random model
     fmodels = glob.glob(join(dirname, "*.bt"))
@@ -43,8 +46,8 @@ def metamorphic_test(dirname, solver, iters):
         # enough mutations, time for solving
         try:
             model = Model(cons)
-            sat = model.solve(solver=solver, time_limit=120)
-            if model.status().runtime > 110:
+            sat = model.solve(solver=solver, time_limit=20)
+            if model.status().runtime > 15:
                 # timeout, skip
                 print('s', end='', flush=True)
                 return True
@@ -63,7 +66,7 @@ def metamorphic_test(dirname, solver, iters):
         with open("lasterrormodel", "wb") as f:
             pickle.dump(model, file=f)
         print(model)
-        # save it etc...
+
 
         return False
 
@@ -144,20 +147,60 @@ def implies_morph(cons):
 
 def flatten_morph(cons):
     randcons = random.choices(cons, k=len(cons))
-    flatcons = flatten_constraint(randcons)
-    return cons + flatcons
 
+    try:
+        flatcons = flatten_constraint(randcons)
+        return cons + flatcons
+    except Exception:
+        print("flatten_constraint crashed with input:", randcons)
+        return cons
+
+def only_numexpr_equality_morph(cons,supported=frozenset()):
+    randcons = random.choices(cons, k=len(cons))
+    newcons = only_numexpr_equality(randcons, supported=supported)
+    return cons + newcons
+
+
+def normalized_boolexpr_morph(cons):
+    randcon = random.choice(cons)
+    lastSelectedConstraints = [randcon]
+    con, newcons = normalized_boolexpr(randcon)
+    cons.append(con)
+    cons.extend(newcons)
+    return cons
+
+def normalized_numexpr_morph(cons):
+    #TODO should call this on subexpressions, so it's actually called on numexpressions as well
+    randcon = random.choice(cons)
+    lastSelectedConstraints = [randcon]
+    con, newcons = normalized_numexpr(randcon)
+    cons.append(con)
+    cons.extend(newcons)
+    return cons
+
+def negated_normal_morph(cons):
+    randcon = random.choice(cons)
+    try:
+        cons.append(~negated_normal(randcon))
+        return cons
+    except Exception:
+        print("negated_normal crashed with input:", randcon)
+        with open("internalfunctioncrash", "wb") as f:
+            pickle.dump([negated_normal, randcon], file=f)
+        return [BoolVal(False)] #to make sure we know something went wrong
+
+def linearize_constraint_morph(cons):
+    randcons = random.choices(cons, k=len(cons))
+    #only apply linearize after flattening
+    flatcons = flatten_constraint(randcons)
+    lincons = linearize_constraint(flatcons)
+    return cons + lincons
 
 
 if __name__ == '__main__':
     dirname = "models"
     solver = "ortools"
     iters = 5 # number of metamorphic mutations per model
-
-    f = 'lasterrormodel'
-    with open(f, 'rb') as fpcl:
-        modle = pickle.loads(fpcl.read())
-        f = modle.solve()
     sat = True
     while sat:
         pass
