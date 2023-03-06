@@ -22,17 +22,14 @@ def lists_to_conjunction(cons):
     return [any(lists_to_conjunction(c)) if is_any_list(c) else c for c in cons]
 
 
-def metamorphic_test(dirname, solver, iters,fmodels):
+def metamorphic_test(dirname, solver, iters,fmodels,enb):
     #list of mutators and the amount of constraints they accept.
     mm_mutators = [(xor_morph),(and_morph),(or_morph),(implies_morph),(not_morph),
                    (negated_normal_morph),(linearize_constraint_morph), (flatten_morph), (only_numexpr_equality_morph), (normalized_numexpr_morph), (normalized_boolexpr_morph)]
-    enb = 0 #error counter to name files
-
     # choose a random model
     f = random.choice(fmodels)
     with open(f, 'rb') as fpcl:
-        #cons = pickle.loads(brotli.decompress(fpcl.read())).constraints
-        cons = [pickle.loads(fpcl.read())[1]]
+        cons = pickle.loads(brotli.decompress(fpcl.read())).constraints
         assert (len(cons)>0), f"{f} has no constraints"
         # replace lists by conjunctions
         cons = lists_to_conjunction(cons)
@@ -53,7 +50,7 @@ def metamorphic_test(dirname, solver, iters,fmodels):
                 with open(filename, "wb") as ff:
                     pickle.dump([function, argument, originalmodel], file=ff) #log function and arguments that caused exception
                 print('IE', end='', flush=True)
-                return True # no need to solve model we didn't modify..
+                return False # no need to solve model we didn't modify..
 
 
         # enough mutations, time for solving
@@ -158,13 +155,14 @@ def normalized_boolexpr_morph(cons):
     except Exception:
         raise Exception(normalized_boolexpr, randcon)
 
-def normalized_numexpr_morph(randcon):
+def normalized_numexpr_morph(cons):
     #TODO should call this on subexpressions, so it's actually called on numexpressions as well
+    randcon = random.choice(cons)
     try:
         con, newcons = normalized_numexpr(randcon)
         return newcons +[con]
     except Exception:
-        raise Exception(normalized_numexpr,randcon)
+        raise Exception(normalized_numexpr, randcon)
 
 def negated_normal_morph(cons):
     con = random.choice(cons)
@@ -191,6 +189,10 @@ if __name__ == '__main__':
     solver = "ortools"
     iters = 5 # number of metamorphic mutations per model
     sat = True
-    while sat:
+    enb = 0
+    while enb < 10:
         fmodels = glob.glob(join(dirname, "*.bt"))
-        sat = metamorphic_test(dirname, solver, iters, fmodels)
+        sat = metamorphic_test(dirname, solver, iters, fmodels, enb)
+        if not sat:
+            enb += 1
+
