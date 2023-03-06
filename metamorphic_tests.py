@@ -22,22 +22,22 @@ def lists_to_conjunction(cons):
     return [any(lists_to_conjunction(c)) if is_any_list(c) else c for c in cons]
 
 
-def metamorphic_test(dirname, solver, iters):
+def metamorphic_test(dirname, solver, iters,fmodels):
     #list of mutators and the amount of constraints they accept.
     mm_mutators = [(xor_morph),(and_morph),(or_morph),(implies_morph),(not_morph),
                    (negated_normal_morph),(linearize_constraint_morph), (flatten_morph), (only_numexpr_equality_morph), (normalized_numexpr_morph), (normalized_boolexpr_morph)]
     enb = 0 #error counter to name files
 
     # choose a random model
-    fmodels = glob.glob(join(dirname, "*.bt"))
     f = random.choice(fmodels)
     with open(f, 'rb') as fpcl:
-        cons = pickle.loads(brotli.decompress(fpcl.read())).constraints
+        #cons = pickle.loads(brotli.decompress(fpcl.read())).constraints
+        cons = [pickle.loads(fpcl.read())[1]]
         assert (len(cons)>0), f"{f} has no constraints"
         # replace lists by conjunctions
         cons = lists_to_conjunction(cons)
         assert (len(cons)>0), f"{f} has no constraints after l2conj"
-
+        assert (Model(cons).solve()), f"{f} is not sat"
         for i in range(iters):
             # choose a metamorphic mutation
             m = random.choice(mm_mutators)
@@ -45,10 +45,13 @@ def metamorphic_test(dirname, solver, iters):
             # log function and arguments in that case
             try:
                 cons += m(cons)  # apply a metamorphic mutation
-            except Exception as args:
+            except Exception as exc:
                 enb += 1
-                with open("internalfunctioncrash"+str(enb), "wb") as f:
-                    pickle.dump([m, randcons], file=f) #log function and arguments that caused exception
+                function, argument = exc.args
+                originalmodel = f
+                filename = "internalfunctioncrash"+str(enb)
+                with open(filename, "wb") as ff:
+                    pickle.dump([function, argument, originalmodel], file=ff) #log function and arguments that caused exception
                 print('IE', end='', flush=True)
                 return True # no need to solve model we didn't modify..
 
@@ -73,6 +76,7 @@ def metamorphic_test(dirname, solver, iters):
             print(e)
 
         # if you got here, the model failed...
+        enb += 1
         with open("lasterrormodel" + str(enb), "wb") as f:
             pickle.dump(model, file=f)
         print(model)
@@ -80,12 +84,13 @@ def metamorphic_test(dirname, solver, iters):
 
 
 '''TRUTH TABLE BASED MORPHS'''
-def not_morph(con):
+def not_morph(cons):
+    con = random.choice(cons)
     ncon = ~con
     return [~ncon]
 def xor_morph(cons):
     '''morph two constraints with XOR'''
-    con1, con2 = cons
+    con1, con2 = random.choices(cons,k=2)
     #add a random option as per xor truth table
     return [random.choice((
         Xor([con1, ~con2]),
@@ -95,7 +100,7 @@ def xor_morph(cons):
 
 def and_morph(cons):
     '''morph two constraints with AND'''
-    con1, con2 = cons
+    con1, con2 = random.choices(cons,k=2)
     return [random.choice((
         ~((con1) & (~con2)),
         ~((~con1) & (~con2)),
@@ -104,7 +109,7 @@ def and_morph(cons):
 
 def or_morph(cons):
     '''morph two constraints with OR'''
-    con1, con2 = cons
+    con1, con2 = random.choices(cons,k=2)
     #add all options as per xor truth table
     return [random.choice((
         ((con1) | (~con2)),
@@ -114,7 +119,7 @@ def or_morph(cons):
 
 def implies_morph(cons):
     '''morph two constraints with ->'''
-    con1, con2 = cons
+    con1, con2 = random.choices(cons,k=2)
     #add all options as per xor truth table
     return [random.choice((
         ~((con1).implies(~con2)),
@@ -125,32 +130,59 @@ def implies_morph(cons):
 '''CPMPY-TRANSFORMATION MORPHS'''
 
 
-def flatten_morph(randcons):
+def flatten_morph(cons):
+    n = random.randint(1,len(cons))
+    randcons = random.choices(cons,k=n)
+    try:
         flatcons = flatten_constraint(randcons)
         return flatcons
+    except Exception as e:
+        raise Exception(flatten_constraint,randcons)
 
 
-def only_numexpr_equality_morph(randcons,supported=frozenset()):
-    newcons = only_numexpr_equality(randcons, supported=supported)
-    return newcons
+def only_numexpr_equality_morph(cons,supported=frozenset()):
+    n = random.randint(1, len(cons))
+    randcons = random.choices(cons, k=n)
+    try:
+        newcons = only_numexpr_equality(randcons, supported=supported)
+        return newcons
+    except Exception:
+        raise Exception(only_numexpr_equality, randcons)
 
 
-def normalized_boolexpr_morph(randcon):
-    con, newcons = normalized_boolexpr(randcon)
-    return newcons + [con]
+def normalized_boolexpr_morph(cons):
+    randcon = random.choice(cons)
+    try:
+        con, newcons = normalized_boolexpr(randcon)
+        return newcons + [con]
+    except Exception:
+        raise Exception(normalized_boolexpr, randcon)
 
 def normalized_numexpr_morph(randcon):
     #TODO should call this on subexpressions, so it's actually called on numexpressions as well
-    con, newcons = normalized_numexpr(randcon)
-    return newcons +[con]
+    try:
+        con, newcons = normalized_numexpr(randcon)
+        return newcons +[con]
+    except Exception:
+        raise Exception(normalized_numexpr,randcon)
 
-def negated_normal_morph(con):
-    return [~negated_normal(con)]
+def negated_normal_morph(cons):
+    con = random.choice(cons)
+    try:
+        nncon = negated_normal(con)
+        return [~nncon]
+    except Exception as e:
+        raise Exception(negated_normal, con)
+
 
 def linearize_constraint_morph(cons):
+    randcons = random.choices(cons,k=len(cons))
     #only apply linearize after flattening
-    flatcons = flatten_constraint(cons)
-    lincons = linearize_constraint(flatcons)
+    flatcons = flatten_constraint(randcons)
+    try:
+        lincons = linearize_constraint(flatcons)
+    except Exception as e:
+        raise Exception(linearize_constraint, flatcons)
     return lincons
 
 
@@ -160,5 +192,5 @@ if __name__ == '__main__':
     iters = 5 # number of metamorphic mutations per model
     sat = True
     while sat:
-        pass
-        sat = metamorphic_test(dirname, solver, iters)
+        fmodels = glob.glob(join(dirname, "*.bt"))
+        sat = metamorphic_test(dirname, solver, iters, fmodels)
