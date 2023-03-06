@@ -24,8 +24,8 @@ def lists_to_conjunction(cons):
 
 def metamorphic_test(dirname, solver, iters):
     #list of mutators and the amount of constraints they accept.
-    mm_mutators = [(xor_morph,2),(and_morph,2),(or_morph,2),(implies_morph,2),(not_morph,1),
-                   (negated_normal_morph,1),(linearize_constraint_morph,0), (flatten_morph,0), (only_numexpr_equality_morph,0), (normalized_numexpr_morph,1), (normalized_boolexpr_morph,1)]
+    mm_mutators = [(xor_morph),(and_morph),(or_morph),(implies_morph),(not_morph),
+                   (negated_normal_morph),(linearize_constraint_morph), (flatten_morph), (only_numexpr_equality_morph), (normalized_numexpr_morph), (normalized_boolexpr_morph)]
     enb = 0 #error counter to name files
 
     # choose a random model
@@ -40,17 +40,11 @@ def metamorphic_test(dirname, solver, iters):
 
         for i in range(iters):
             # choose a metamorphic mutation
-            m, arity = random.choice(mm_mutators)
+            m = random.choice(mm_mutators)
             # an error can occur in the transformations, so even before the solve call.
             # log function and arguments in that case
             try:
-                if arity == 0: #random number of constraints
-                    randcons = random.choices(cons,k=len(cons))
-                elif arity == 1:
-                    randcons = random.choice(cons)
-                else:
-                    randcons = random.choices(cons,k=arity)
-                cons += m(randcons)  # apply a metamorphic mutation
+                cons += m(cons)  # apply a metamorphic mutation
             except Exception as args:
                 enb += 1
                 with open("internalfunctioncrash"+str(enb), "wb") as f:
