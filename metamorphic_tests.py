@@ -7,6 +7,8 @@ from os.path import join
 import argparse
 import random
 
+from cpmpy.transformations.get_variables import get_variables
+
 from cpmpy.transformations.linearize import linearize_constraint
 
 from cpmpy import *
@@ -26,8 +28,10 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
     #list of mutators and the amount of constraints they accept.
     mm_mutators = [(xor_morph),(and_morph),(or_morph),(implies_morph),(not_morph),
                    (negated_normal_morph),(linearize_constraint_morph), (flatten_morph), (only_numexpr_equality_morph), (normalized_numexpr_morph), (normalized_boolexpr_morph)]
+    #mm_mutators = [add_solution]
     # choose a random model
     f = random.choice(fmodels)
+    originalmodel = f
     with open(f, 'rb') as fpcl:
         cons = pickle.loads(brotli.decompress(fpcl.read())).constraints
         assert (len(cons)>0), f"{f} has no constraints"
@@ -35,17 +39,18 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
         cons = lists_to_conjunction(cons)
         assert (len(cons)>0), f"{f} has no constraints after l2conj"
         assert (Model(cons).solve()), f"{f} is not sat"
+        mutators = []
         for i in range(iters):
             # choose a metamorphic mutation
             m = random.choice(mm_mutators)
             # an error can occur in the transformations, so even before the solve call.
             # log function and arguments in that case
+            mutators += [m]
             try:
                 cons += m(cons)  # apply a metamorphic mutation
             except Exception as exc:
                 enb += 1
                 function, argument = exc.args
-                originalmodel = f
                 filename = "internalfunctioncrash"+str(enb)
                 with open(filename, "wb") as ff:
                     pickle.dump([function, argument, originalmodel], file=ff) #log function and arguments that caused exception
@@ -67,7 +72,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                 return True
             else:
                 print('X', end='', flush=True)
-                print('lastmorph: ', m)
+                print('morphs: ', mutators)
         except Exception as e:
             print('E', end='', flush=True)
             print(e)
@@ -75,7 +80,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
         # if you got here, the model failed...
         enb += 1
         with open("lasterrormodel" + str(enb), "wb") as f:
-            pickle.dump(model, file=f)
+            pickle.dump(model, originalmodel, mutators, file=f)
         print(model)
         return False
 
@@ -183,6 +188,9 @@ def linearize_constraint_morph(cons):
         raise Exception(linearize_constraint, flatcons)
     return lincons
 
+def add_solution(cons):
+    vars = get_variables(cons)
+    return [var == var.value() for var in vars]
 
 if __name__ == '__main__':
     dirname = "models"
