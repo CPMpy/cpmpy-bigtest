@@ -42,7 +42,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                    reify_rewrite_morph,
                    only_bv_implies_morph,
                    add_solution]
-    mm_mutators = [semanticFusion]
+    #mm_mutators = [normalized_numexpr_morph]
     # choose a random model
     f = random.choice(fmodels)
     originalmodel = f
@@ -182,14 +182,44 @@ def normalized_boolexpr_morph(cons):
         raise MetamorphicError(normalized_boolexpr, randcon, e)
 
 def normalized_numexpr_morph(cons):
-    #TODO should call this on subexpressions, so it's actually called on numexpressions as well
-    randcon = random.choice(cons)
-    try:
-        con, newcons = normalized_numexpr(randcon)
-        return newcons +[con]
-    except Exception as e:
-        raise MetamorphicError(normalized_numexpr, randcon, e)
+    random.shuffle(cons)
+    firstcon = None
+    for i, con in enumerate(cons):
+        res = pickaritmetic(con, log=[i])
+        if res != []:
+            firstcon = random.choice(res)
+            break #numexpr found
+    if firstcon is None:
+        #no numexpressions found but still call the function to test on all inputs
+        randcon = random.choice(cons)
+        try:
+            con, newcons = normalized_numexpr(randcon)
+            return cons + newcons + [con]
+        except Exception as e:
+            raise MetamorphicError(normalized_numexpr, randcon, e)
+    else:
+        #get the numexpr
+        arg = cons[firstcon[0]]
+        newfirst = arg
+        for i in firstcon[1:]:
+            arg = arg.args[i]
+        firstexpr = arg
+        try:
+            con, newcons = normalized_numexpr(firstexpr)
+        except Exception as e:
+            raise MetamorphicError(normalized_numexpr, firstexpr, e)
 
+        # make the new constraint (newfirst)
+        arg = newfirst
+        c = 1
+        for i in firstcon[1:]:
+            c += 1
+            if c == len(firstcon):
+                arg.args[i] = con
+            else:
+                arg = arg.args[i]
+
+        return cons + [newfirst] + newcons
 def negated_normal_morph(cons):
     con = random.choice(cons)
     try:
