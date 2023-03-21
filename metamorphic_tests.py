@@ -136,12 +136,15 @@ def or_morph(cons):
 def implies_morph(cons):
     '''morph two constraints with ->'''
     con1, con2 = random.choices(cons,k=2)
-    #add all options as per xor truth table
-    return [random.choice((
-        ~((con1).implies(~con2)),
-        ((~con1).implies(~con2)),
-        ((~con1).implies(con2)),
-        ((con1).implies(con2))))]
+    try:
+        #add all options as per xor truth table
+        return [random.choice((
+            ~((con1).implies(~con2)),
+            ((~con1).implies(~con2)),
+            ((~con1).implies(con2)),
+            ((con1).implies(con2))))]
+    except Exception as e:
+        raise MetamorphicError(implies_morph,cons,e)
 
 '''CPMPY-TRANSFORMATION MORPHS'''
 
