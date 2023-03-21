@@ -15,7 +15,9 @@ from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from cpmpy.transformations.comparison import only_numexpr_equality
 from metamorphic_tests import *
 a = False
+a = True
 b = False
+#b = True
 c = False
 #c = True
 
@@ -38,17 +40,17 @@ if a:
     f = 'internalcrashes\\internalfunctioncrash1'
     #will crash when file does not exist
     for n in range(1,11):
-        f = 'internalfunctioncrash' + str(n)
+        f = 'internalfunctioncrash5.pickle'
         with open(f, 'rb') as fpcl:
-            funct,argum,lastmodel = pickle.loads(fpcl.read())
+            funct,argum,lastmodel,e = pickle.loads(fpcl.read())
             print(funct)
 
 #read lasterrormodel (unsat model)
 elif b:
-    f = 'lasterrormodel0'
+    f = 'lasterrormodel1.pickle'
     with open(f, 'rb') as fpcl:
         modle, originalmodel, mutatorsused = pickle.loads(fpcl.read())
-        constraints = modle.constraint
+        constraints = modle.constraints
         #checking if subset of constraints is unsat
         n = len(constraints)
         cons = constraints[:n-20]

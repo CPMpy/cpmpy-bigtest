@@ -7,12 +7,16 @@ from os.path import join
 import argparse
 import random
 
+from cpmpy import intvar
+
+from cpmpy.expressions.core import Expression, Operator
+
 from cpmpy.transformations.get_variables import get_variables
 
 from cpmpy.transformations.linearize import linearize_constraint
 
 import cpmpy as cp
-from cpmpy.expressions.utils import is_any_list
+from cpmpy.expressions.utils import is_any_list, is_boolexpr
 from cpmpy.transformations.flatten_model import flatten_constraint, normalized_boolexpr, normalized_numexpr, \
     negated_normal
 from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
@@ -38,7 +42,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                    reify_rewrite_morph,
                    only_bv_implies_morph,
                    add_solution]
-    #mm_mutators = [add_solution]
+    mm_mutators = [semanticFusion]
     # choose a random model
     f = random.choice(fmodels)
     originalmodel = f
@@ -91,7 +95,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
         enb += 1
         with open("lasterrormodel" + str(enb)+".pickle", "wb") as f:
             pickle.dump([model, originalmodel, mutators], file=f)
-        print(model)
+        #print(model)
         return False
 
 
@@ -223,6 +227,141 @@ def add_solution(cons):
     vars = get_variables(cons)
     return [var == var.value() for var in vars]
 
+
+def semanticFusion(cons):
+    try:
+        firstcon = None
+        secondcon = None
+        random.shuffle(cons)
+        for i, con in enumerate(cons):
+            res = pickaritmetic(con,log=[i])
+            if res != []:
+                if firstcon == None:
+                    firstcon = random.choice(res)
+                elif secondcon == None:
+                    secondcon = random.choice(res)
+                    break #stop when 2 constraints found. still random because cons are shuffled
+
+        if secondcon != None:
+            #two constraints with aritmetic expressions found, perform semantic fusion on them
+            #get the expressions to fuse
+            arg = cons[firstcon[0]]
+            newfirst = arg
+            for i in firstcon[1:]:
+                arg = arg.args[i]
+            firstexpr = arg
+
+            arg = cons[secondcon[0]]
+            newsecond = arg
+            for i in secondcon[1:]:
+                arg = arg.args[i]
+            secondexpr = arg
+
+            lb,ub = Operator('sum',[firstexpr,secondexpr]).get_bounds()
+            z = intvar(lb, ub)
+            if is_any_list(firstexpr) or is_any_list(secondexpr):
+                print('bugged')
+                pass
+            firstexpr, secondexpr = z - secondexpr, z - firstexpr
+
+            #make the new constraints
+            arg = newfirst
+            c = 1
+            for i in firstcon[1:]:
+                c+=1
+                if c == len(firstcon):
+                    arg.args[i] = firstexpr
+                else:
+                    arg = arg.args[i]
+
+            arg = newsecond
+            c = 1
+            for i in secondcon[1:]:
+                c += 1
+                if c == len(secondcon):
+                    arg.args[i] = secondexpr
+                else:
+                    arg = arg.args[i]
+
+            return cons + [newfirst,newsecond]
+
+        else:
+            #no expressions found to fuse
+            return cons
+
+    except Exception as e:
+        raise MetamorphicError(semanticFusion, cons, e)
+
+'''
+returns a list of aritmetic expressions that occur in the input expression. 
+One (random) candidate is taken from each level of the expression if there exists one '''
+def pickaritmetic(con,log=[], candidates=[]):
+    if hasattr(con,'name'):
+        if con.name == 'wsum':
+            #wsum has lists as arguments so we need a separate case
+            #wsum is the lowest possible level
+            return candidates + [log]
+        if con.name == "element":
+            #no good way to know if element will return bool or not so ignore it (lists and element always return false to isbool)
+            return candidates
+    if hasattr(con, "args"):
+        iargs = [(j, e) for j, e in enumerate(con.args)]
+        random.shuffle(iargs)
+        for j, arg in iargs:
+            if is_boolexpr(arg):
+                res = pickaritmetic(arg,log+[j])
+                if res != []:
+                    return res
+            else:
+                return pickaritmetic(arg,log+[j],candidates+[log+[j]])
+
+    return candidates
+
+'''def semanticFusionIntInt(satModel, operation, invOperation):
+    newcons = []
+    firstCons = None
+    secCons = None
+
+    for i, cons in enumerate(satModel.modifModel.constraints):
+        if firstCons is None and hasattr(cons, "args"):
+            if (isinstance(cons.args[0], variables._IntVarImpl) or isinstance(cons.args[0], variables._NumVarImpl)):
+                firstCons = cons
+                continue
+        elif secCons is None and firstCons is not None and hasattr(cons, "args"):
+            if (isinstance(cons.args[0], variables._IntVarImpl) or isinstance(cons.args[0], variables._NumVarImpl)):
+                secCons = cons
+                continue
+        newcons += [cons]
+
+    if secCons is None:
+        return newcons
+
+    x = firstCons.args[0]
+    y = secCons.args[0]
+    # can be written with python build-in max and min, but those are overwritten by CPMpy,
+    # writing this is easier then looking up how to use the overwritten build-ins
+    maxLb = operation(x.lb, y.lb) if operation(x.lb, y.lb) > operation(x.ub, y.ub) else operation(x.ub, y.ub)
+    minUb = operation(x.lb, y.lb) if operation(x.lb, y.lb) < operation(x.ub, y.ub) else operation(x.ub, y.ub)
+    try:
+        z = intvar(lb=maxLb, ub=minUb, name=("i" + str(random.randint(0,1000))))
+    except Exception as e:
+        return newcons
+    xr = invOperation(z, y)
+    yr = invOperation(z, x)
+    firstCons.args[0] = xr
+    secCons.args[0] = yr
+    newcons += [(firstCons) & (secCons)]
+
+    # replace some X, Y by xr, yr
+    # for j, cons in enumerate(newcons): # could cause cyclic expressions
+    #     if hasattr(cons, "args"):
+    #         for i, arg in enumerate(cons.args):
+    #             if hasattr(arg, "name") and arg.name == x.name and random.random() < 0.5:
+    #                 cons.args[i] = xr
+    #             if hasattr(arg, "name") and arg.name == y.name and random.random() < 0.5:
+    #                 cons.args[i] = yr
+    return newcons
+'''
 
 class MetamorphicError(Exception):
     pass
