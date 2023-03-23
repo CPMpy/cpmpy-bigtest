@@ -23,7 +23,7 @@ from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from cpmpy.transformations.comparison import only_numexpr_equality
 
 from cpmpy.expressions.globalconstraints import Xor
-
+from cpmpy.expressions.python_builtins import any
 
 def lists_to_conjunction(cons):
     # recursive...
@@ -41,7 +41,8 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                    normalized_boolexpr_morph,
                    reify_rewrite_morph,
                    only_bv_implies_morph,
-                   add_solution]
+                   add_solution,
+                   semanticFusion]
     #mm_mutators = [normalized_numexpr_morph]
     # choose a random model
     f = random.choice(fmodels)

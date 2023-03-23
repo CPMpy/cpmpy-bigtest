@@ -15,9 +15,9 @@ from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from cpmpy.transformations.comparison import only_numexpr_equality
 from metamorphic_tests import *
 a = False
-a = True
+#a = True
 b = False
-#b = True
+b = True
 c = False
 #c = True
 
@@ -50,8 +50,14 @@ elif b:
     f = 'lasterrormodel1.pickle'
     with open(f, 'rb') as fpcl:
         modle, originalmodel, mutatorsused = pickle.loads(fpcl.read())
-        constraints = modle.constraints
+        #redoing mutations on orignal model
+        with open(originalmodel, 'rb') as fpcl2:
+            cons = pickle.loads(brotli.decompress(fpcl2.read())).constraints
+        cons = lists_to_conjunction(cons)
+        for mut in mutatorsused:
+            cons = mut(cons)
         #checking if subset of constraints is unsat
+        constraints = modle.constraints
         n = len(constraints)
-        cons = constraints[:n-20]
-        print(Model(cons).solve())
+        constr = constraints[:n-20]
+        print(Model(constr).solve())
