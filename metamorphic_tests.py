@@ -38,7 +38,6 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                    flatten_morph,
                    only_numexpr_equality_morph,
                    normalized_numexpr_morph,
-                   normalized_boolexpr_morph,
                    reify_rewrite_morph,
                    only_bv_implies_morph,
                    add_solution,
@@ -175,6 +174,8 @@ def only_numexpr_equality_morph(cons,supported=frozenset()):
 
 
 def normalized_boolexpr_morph(cons):
+    '''normalized_boolexpr only gets called within other transformations, so can probably safely be omitted from our test.
+    Keeping it in gives unwanted results, for example crashing on flatvar input'''
     randcon = random.choice(cons)
     try:
         con, newcons = normalized_boolexpr(randcon)

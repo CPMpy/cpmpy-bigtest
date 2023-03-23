@@ -15,9 +15,9 @@ from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from cpmpy.transformations.comparison import only_numexpr_equality
 from metamorphic_tests import *
 a = False
-#a = True
+a = True
 b = False
-b = True
+#b = True
 c = False
 #c = True
 
@@ -35,15 +35,13 @@ if c:
 
         pass
 
-#read an internal crash, I put them in a separate folder called internalcrashes
+#read an internal crash
 if a:
-    f = 'internalcrashes\\internalfunctioncrash1'
-    #will crash when file does not exist
-    for n in range(1,11):
-        f = 'internalfunctioncrash5.pickle'
-        with open(f, 'rb') as fpcl:
-            funct,argum,lastmodel,e = pickle.loads(fpcl.read())
-            print(funct)
+    f = 'internalcrashes\\internalfunctioncrash'
+    f = 'internalfunctioncrash4.pickle'
+    with open(f, 'rb') as fpcl:
+        funct,argum,lastmodel,e = pickle.loads(fpcl.read())
+        funct(argum)
 
 #read lasterrormodel (unsat model)
 elif b:
