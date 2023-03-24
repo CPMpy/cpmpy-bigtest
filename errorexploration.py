@@ -15,7 +15,7 @@ from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from cpmpy.transformations.comparison import only_numexpr_equality
 from metamorphic_tests import *
 a = False
-a = True
+#a = True
 b = False
 #b = True
 c = False
@@ -24,21 +24,15 @@ c = False
 #to read one of the original models: decompress as well
 if c:
     #f = 'internalcrashes\\internalfunctioncrashnormalizenumexpr'
-    f = 'models\\hakank-sudoku1665051085219474.bt'
+    f = 'models\\4_marco-mus-mcs-enumeration1665051222590934.bt'
     with open(f, 'rb') as fpcl:
         modle = pickle.loads(brotli.decompress(fpcl.read()))
         cons = modle.constraints
-        #funct, argum, lastmodel = pickle.loads(fpcl.read())
-        #print(modle.solve())
-        #cons = lastmodel.constraints
-        #funct(argum)
-
-        pass
+        print(modle.solve())
 
 #read an internal crash
 if a:
-    f = 'internalcrashes\\internalfunctioncrash'
-    f = 'internalfunctioncrash4.pickle'
+    f = 'internalfunctioncrash5.pickle'
     with open(f, 'rb') as fpcl:
         funct,argum,lastmodel,e = pickle.loads(fpcl.read())
         funct(argum)
