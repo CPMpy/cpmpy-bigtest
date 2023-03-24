@@ -13,6 +13,3 @@ If a model becomes unsat after transformations, a file with the name lasterrormo
 model (the unsat model), originalmodel, mutators (list of mutators that were used)
 
 This files can be read by using pickle.load, as you can see in the example code in errorexploration.py
-
-## Coverage
-
