@@ -35,23 +35,27 @@ if c:
 
         pass
 
-#read an internal crash, I put them in a separate folder called internalcrashes
+#read an internal crash
 if a:
-    f = 'internalcrashes\\internalfunctioncrash1'
-    #will crash when file does not exist
-    for n in range(1,11):
-        f = 'internalfunctioncrash5.pickle'
-        with open(f, 'rb') as fpcl:
-            funct,argum,lastmodel,e = pickle.loads(fpcl.read())
-            print(funct)
+    f = 'internalcrashes\\internalfunctioncrash'
+    f = 'internalfunctioncrash4.pickle'
+    with open(f, 'rb') as fpcl:
+        funct,argum,lastmodel,e = pickle.loads(fpcl.read())
+        funct(argum)
 
 #read lasterrormodel (unsat model)
 elif b:
     f = 'lasterrormodel1.pickle'
     with open(f, 'rb') as fpcl:
         modle, originalmodel, mutatorsused = pickle.loads(fpcl.read())
-        constraints = modle.constraints
+        #redoing mutations on orignal model
+        with open(originalmodel, 'rb') as fpcl2:
+            cons = pickle.loads(brotli.decompress(fpcl2.read())).constraints
+        cons = lists_to_conjunction(cons)
+        for mut in mutatorsused:
+            cons = mut(cons)
         #checking if subset of constraints is unsat
+        constraints = modle.constraints
         n = len(constraints)
-        cons = constraints[:n-20]
-        print(Model(cons).solve())
+        constr = constraints[:n-20]
+        print(Model(constr).solve())
