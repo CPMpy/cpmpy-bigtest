@@ -35,7 +35,6 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
         # replace lists by conjunctions
         cons = lists_to_conjunction(cons)
         assert (len(cons)>0), f"{f} has no constraints after l2conj"
-        model.constraints = cons
         assert (model.solve()), f"{f} is not sat"
         objective = model.objective_
         value_before = model.objective_value() #store objective value to compare after transformations
@@ -61,16 +60,19 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
 
         # enough mutations, time for solving
         try:
-            #model.constraints = cons
-            #not necessary because we did this before and it's by reference apparently
-            sat = model.solve(solver=solver, time_limit=20)
-            if model.objective_value() != value_before:
-                #objective value changed
-                print('c', end='', flush=True)
-            if model.status().runtime > 15:
+            newModel = cp.Model(cons)
+            if mininimize:
+                newModel.minimize(objective)
+            else:
+                newModel.maximize(objective)
+            sat = newModel.solve(solver=solver, time_limit=20)
+            if newModel.status().runtime > 15:
                 # timeout, skip
                 print('s', end='', flush=True)
                 return True
+            if newModel.objective_value() != value_before:
+                #objective value changed
+                print('c', end='', flush=True)
             elif sat:
                 # has to be SAT...
                 print('.', end='', flush=True)
