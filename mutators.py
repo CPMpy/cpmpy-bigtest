@@ -172,7 +172,7 @@ def only_bv_implies_morph(cons):
 
 def add_solution(cons):
     vars = get_variables(cons)
-    return [var == var.value() for var in vars]
+    return [var == var.value() for var in vars if var is not None]
 
 
 def semanticFusion(cons):
