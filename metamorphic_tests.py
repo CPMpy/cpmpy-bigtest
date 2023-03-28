@@ -4,7 +4,9 @@ import pickle
 from os.path import join
 import cpmpy as cp
 from cpmpy.expressions.python_builtins import any
-from .mutators import *
+from mutators import *
+
+
 def lists_to_conjunction(cons):
     # recursive...
     return [any(lists_to_conjunction(c)) if is_any_list(c) else c for c in cons]

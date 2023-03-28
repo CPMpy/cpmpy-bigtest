@@ -143,7 +143,8 @@ def negated_normal_morph(cons):
 
 
 def linearize_constraint_morph(cons):
-    randcons = random.choices(cons,k=len(cons))
+    n = random.randint(1, len(cons))
+    randcons = random.choices(cons, k=n)
     #only apply linearize after flattening
     flatcons = flatten_morph(randcons, flatten_all=True)
     try:
@@ -152,7 +153,8 @@ def linearize_constraint_morph(cons):
         raise MetamorphicError(linearize_constraint, flatcons, e)
 
 def reify_rewrite_morph(cons):
-    randcons = random.choices(cons,k=len(cons))
+    n = random.randint(1, len(cons))
+    randcons = random.choices(cons, k=n)
     #only apply linearize after flattening
     flatcons = flatten_morph(randcons, flatten_all=True)
     try:
@@ -162,13 +164,16 @@ def reify_rewrite_morph(cons):
 
 
 def only_bv_implies_morph(cons):
-    randcons = random.choices(cons,k=len(cons))
+    n = random.randint(1, len(cons))
+    randcons = random.choices(cons, k=n)
     #only apply linearize after flattening
     flatcons = flatten_morph(randcons, flatten_all=True)
     try:
         return only_bv_implies(flatcons)
     except Exception as e:
         raise MetamorphicError(only_bv_implies, flatcons, e)
+
+#decompose_globals()
 
 def add_solution(cons):
     vars = get_variables(cons)
@@ -206,9 +211,6 @@ def semanticFusion(cons):
 
             lb,ub = Operator('sum',[firstexpr,secondexpr]).get_bounds()
             z = intvar(lb, ub)
-            if is_any_list(firstexpr) or is_any_list(secondexpr):
-                print('bugged')
-                pass
             firstexpr, secondexpr = z - secondexpr, z - firstexpr
 
             #make the new constraints
@@ -217,6 +219,8 @@ def semanticFusion(cons):
             for i in firstcon[1:]:
                 c+=1
                 if c == len(firstcon):
+                    if isinstance(arg.args, tuple):
+                        arg.args = list(arg.args)
                     arg.args[i] = firstexpr
                 else:
                     arg = arg.args[i]
@@ -226,6 +230,8 @@ def semanticFusion(cons):
             for i in secondcon[1:]:
                 c += 1
                 if c == len(secondcon):
+                    if isinstance(arg.args, tuple):
+                        arg.args = list(arg.args)
                     arg.args[i] = secondexpr
                 else:
                     arg = arg.args[i]
