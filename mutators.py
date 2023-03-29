@@ -96,7 +96,8 @@ def normalized_boolexpr_morph(cons):
     except Exception as e:
         raise MetamorphicError(normalized_boolexpr, randcon, e)
 
-def normalized_numexpr_morph(cons):
+def normalized_numexpr_morph(const):
+    cons = copy.deepcopy(const)
     random.shuffle(cons)
     firstcon = None
     for i, con in enumerate(cons):
@@ -109,7 +110,7 @@ def normalized_numexpr_morph(cons):
         randcon = random.choice(cons)
         try:
             con, newcons = normalized_numexpr(randcon)
-            return cons + newcons + [con]
+            return newcons + [con]
         except Exception as e:
             raise MetamorphicError(normalized_numexpr, randcon, e)
     else:
@@ -134,7 +135,7 @@ def normalized_numexpr_morph(cons):
             else:
                 arg = arg.args[i]
 
-        return cons + [newfirst] + newcons
+        return [newfirst] + newcons
 def negated_normal_morph(cons):
     con = random.choice(cons)
     try:
