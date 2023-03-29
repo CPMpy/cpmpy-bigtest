@@ -29,3 +29,31 @@ def mes_naive(soft, hard=[], solver="ortools"):
         except:
             pass
     return mes
+
+def mis_naive(soft,internalfunction, hard=[]):
+    """
+        Like MUS algorithm but in stead of looking for the model becoming sat
+        we look for the internal transformation call to not throw an error anymore
+    """
+    no_error = False
+    try:
+        internalfunction(soft + hard)
+        no_error = True
+    except Exception:
+        pass
+    if no_error:
+        raise AssertionError("function call should throw error")
+
+    mis = []
+    # order so that constraints with many variables are tried and removed first
+    core = sorted(soft, key=lambda c: -len(get_variables(c)))
+    for i in range(len(core)):
+        subcore = mis + core[i + 1:]  # check if all but 'i' makes core SAT
+
+        try:
+            internalfunction(hard + subcore)
+            #removing it gives no more error, keep it
+            mis.append(core[i])
+        except:
+            pass
+    return mis
