@@ -24,7 +24,6 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                    only_bv_implies_morph,
                    add_solution,
                    semanticFusion]
-    #mm_mutators = [normalized_numexpr_morph]
     # choose a random model
     f = random.choice(fmodels)
     originalmodel = f
@@ -35,10 +34,15 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
         # replace lists by conjunctions
         cons = lists_to_conjunction(cons)
         assert (len(cons)>0), f"{f} has no constraints after l2conj"
-        assert (model.solve()), f"{f} is not sat"
         objective = model.objective_
-        value_before = model.objective_value() #store objective value to compare after transformations
         mininimize = model.objective_is_min
+        model = cp.Model(cons)
+        if mininimize:
+            model.minimize(objective)
+        else:
+            model.maximize(objective)
+        assert (model.solve()), f"{f} is not sat"
+        value_before = model.objective_value() #store objective value to compare after transformations
         mutators = []
         for i in range(iters):
             # choose a metamorphic mutation
@@ -70,7 +74,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                 # timeout, skip
                 print('s', end='', flush=True)
                 return True
-            if newModel.objective_value() != value_before:
+            elif newModel.objective_value() != value_before:
                 #objective value changed
                 print('c', end='', flush=True)
             elif sat:
@@ -87,7 +91,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
         # if you got here, the model failed...
         enb += 1
         with open("lasterrormodel_opt" + str(enb)+".pickle", "wb") as f:
-            pickle.dump([model, originalmodel, mutators], file=f)
+            pickle.dump([newModel, originalmodel, mutators], file=f)
         #print(model)
         return False
 
@@ -98,6 +102,7 @@ if __name__ == '__main__':
     iters = 5 # number of metamorphic mutations per model
     sat = True
     enb = 0
+
 
     random.seed(0)
     while enb < 10:
