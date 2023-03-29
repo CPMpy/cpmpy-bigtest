@@ -1,3 +1,4 @@
+import copy
 import random
 from cpmpy import intvar
 from cpmpy.expressions.core import Expression, Operator
@@ -180,10 +181,11 @@ def add_solution(cons):
     return [var == var.value() for var in vars if var.value() is not None]
 
 
-def semanticFusion(cons):
+def semanticFusion(const):
     try:
         firstcon = None
         secondcon = None
+        cons = copy.deepcopy(const)
         random.shuffle(cons)
         for i, con in enumerate(cons):
             res = pickaritmetic(con,log=[i])
@@ -236,11 +238,11 @@ def semanticFusion(cons):
                 else:
                     arg = arg.args[i]
 
-            return cons + [newfirst,newsecond]
+            return [newfirst,newsecond]
 
         else:
             #no expressions found to fuse
-            return cons
+            return []
 
     except Exception as e:
         raise MetamorphicError(semanticFusion, cons, e)
