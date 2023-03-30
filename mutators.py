@@ -1,12 +1,17 @@
 import copy
 import random
+
+from cpmpy.transformations.to_cnf import flat2cnf
+
 from cpmpy import intvar
-from cpmpy.expressions.core import Expression, Operator
+from cpmpy.expressions.core import Expression, Operator, Comparison
+from cpmpy.transformations.decompose_global import decompose_global
 from cpmpy.transformations.get_variables import get_variables
-from cpmpy.transformations.linearize import linearize_constraint
+from cpmpy.transformations.linearize import linearize_constraint, only_positive_bv, only_const_rhs, only_var_lhs
 from cpmpy.expressions.utils import is_any_list, is_boolexpr
 from cpmpy.transformations.flatten_model import flatten_constraint, normalized_boolexpr, normalized_numexpr, \
     negated_normal
+from cpmpy.transformations.normalize import toplevel_list
 from cpmpy.transformations.reification import only_bv_implies, reify_rewrite
 from cpmpy.transformations.comparison import only_numexpr_equality
 from cpmpy.expressions.globalconstraints import Xor
@@ -144,9 +149,12 @@ def negated_normal_morph(cons):
         raise MetamorphicError(negated_normal, con, e)
 
 
-def linearize_constraint_morph(cons):
-    n = random.randint(1, len(cons))
-    randcons = random.choices(cons, k=n)
+def linearize_constraint_morph(cons,linearize_all=False):
+    if linearize_all:
+        randcons = cons
+    else:
+        n = random.randint(1, len(cons))
+        randcons = random.choices(cons, k=n)
     #only apply linearize after flattening
     flatcons = flatten_morph(randcons, flatten_all=True)
     try:
@@ -165,9 +173,12 @@ def reify_rewrite_morph(cons):
         raise MetamorphicError(reify_rewrite, flatcons, e)
 
 
-def only_bv_implies_morph(cons):
-    n = random.randint(1, len(cons))
-    randcons = random.choices(cons, k=n)
+def only_bv_implies_morph(cons,morph_all=True):
+    if morph_all:
+        randcons = cons
+    else:
+        n = random.randint(1, len(cons))
+        randcons = random.choices(cons, k=n)
     #only apply linearize after flattening
     flatcons = flatten_morph(randcons, flatten_all=True)
     try:
@@ -175,7 +186,46 @@ def only_bv_implies_morph(cons):
     except Exception as e:
         raise MetamorphicError(only_bv_implies, flatcons, e)
 
-#decompose_globals()
+def only_positive_bv_morph(cons):
+    lincons = linearize_constraint_morph(cons,linearize_all=True)
+    try:
+        return only_positive_bv(lincons)
+    except Exception as e:
+        raise MetamorphicError(only_positive_bv, lincons, e)
+
+def only_const_rhs_morph(cons):
+    lincons = linearize_constraint_morph(cons, linearize_all=True)
+    try:
+        return only_const_rhs(lincons)
+    except Exception as e:
+        raise MetamorphicError(only_const_rhs, lincons, e)
+
+def only_var_lhs_morph(cons):
+    lincons = linearize_constraint_morph(cons, linearize_all=True)
+    try:
+        return only_var_lhs(lincons)
+    except Exception as e:
+        raise MetamorphicError(only_var_lhs, lincons, e)
+
+def flat2cnf_morph(cons):
+    flatcons = flatten_morph(cons,flatten_all=True)
+    onlycons = only_bv_implies_morph(flatcons,morph_all=True)
+    try:
+        return flat2cnf(onlycons)
+    except:
+        raise MetamorphicError(flat2cnf, onlycons, e)
+def toplevel_list_morph(cons):
+    try:
+        return toplevel_list(cons)
+    except Exception as e:
+        raise MetamorphicError(toplevel_list, cons, e)
+
+
+def decompose_globals_morph(cons):
+    try:
+        return decompose_global(cons)
+    except Exception as e:
+        raise MetamorphicError(decompose_global, cons, e)
 
 def add_solution(cons):
     vars = get_variables(cons)
@@ -248,11 +298,54 @@ def semanticFusion(const):
     except Exception as e:
         raise MetamorphicError(semanticFusion, cons, e)
 
+def aritmetic_comparison_morph(const):
+    cons = copy.deepcopy(const)
+    random.shuffle(cons)
+    firstcon = None
+    for i, con in enumerate(cons):
+        res = pickaritmeticComparison(con, log=[i])
+        if res != []:
+            firstcon = random.choice(res)
+            break  # numexpr found
+    if firstcon is None:
+        # no arithmetic comparisons found
+        return []
+    else:
+        # get the expression
+        arg = cons[firstcon[0]]
+        newfirst = arg
+        for i in firstcon[1:]:
+            arg = arg.args[i]
+        firstexpr = arg
+        try:
+            lhs = firstexpr.args[0]
+            rhs = firstexpr.args[1]
+            lhs = lhs * 0.5
+            rhs = rhs * 0.5
+            newcon = Comparison(name=firstexpr.name,left=lhs,right=rhs)
+        except Exception as e:
+            raise MetamorphicError(aritmetic_comparison_morph, firstexpr, e)
+
+        # make the new constraint (newfirst)
+        arg = newfirst
+        if len(firstcon) == 1: #toplevel comparison
+            return [newcon]
+        c = 1
+        for i in firstcon[1:]:
+            c += 1
+            if c == len(firstcon):
+                arg.args[i] = newcon
+            else:
+                arg = arg.args[i]
+
+        return [newfirst]
+
 class MetamorphicError(Exception):
     pass
 
 '''
-returns a list of aritmetic expressions that occur in the input expression. 
+returns a list of aritmetic expressions (as lists of indexes to traverse the expression tree)
+that occur in the input expression. 
 One (random) candidate is taken from each level of the expression if there exists one '''
 def pickaritmetic(con,log=[], candidates=[]):
     if hasattr(con,'name'):
@@ -273,5 +366,36 @@ def pickaritmetic(con,log=[], candidates=[]):
                     return res
             else:
                 return pickaritmetic(arg,log+[j],candidates+[log+[j]])
+
+    return candidates
+
+'''
+Adapted pickaritmetic that only picks from arithmetic comparisons
+used for mutators that i.e. multiple both sides with a number
+returns a list of aritmetic expressions (as lists of indexes to traverse the expression tree)
+that occur in the input expression. 
+One (random) candidate is taken from each level of the expression if there exists one '''
+def pickaritmeticComparison(con,log=[], candidates=[]):
+    if hasattr(con,'name'):
+        if con.name == 'wsum':
+            #wsum has lists as arguments so we need a separate case
+            #wsum is the lowest possible level
+            return candidates
+        if con.name == "element" or con.name == "table":
+            #no good way to know if element will return bool or not so ignore it (lists and element always return false to isbool)
+            return candidates
+    if hasattr(con, "args"):
+        iargs = [(j, e) for j, e in enumerate(con.args)]
+        random.shuffle(iargs)
+        for j, arg in iargs:
+            if is_boolexpr(arg):
+                res = pickaritmeticComparison(arg,log+[j], candidates)
+                if res != []:
+                    return res
+            else:
+                if isinstance(con,Comparison):
+                    return pickaritmeticComparison(arg,log+[j],candidates+[log])
+                else:
+                    return pickaritmeticComparison(arg,log+[j],candidates)
 
     return candidates
