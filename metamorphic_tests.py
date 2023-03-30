@@ -13,6 +13,7 @@ def lists_to_conjunction(cons):
 
 
 def metamorphic_test(dirname, solver, iters,fmodels,enb):
+
     #list of mutators and the amount of constraints they accept.
     mm_mutators = [xor_morph, and_morph, or_morph, implies_morph, not_morph,
                    negated_normal_morph,
@@ -22,9 +23,14 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                    normalized_numexpr_morph,
                    reify_rewrite_morph,
                    only_bv_implies_morph,
+                   only_var_lhs_morph,
+                   only_const_rhs_morph,
+                   only_positive_bv_morph,
+                   flat2cnf_morph,
+                   toplevel_list_morph,
+                   decompose_globals_morph,
                    add_solution,
                    semanticFusion]
-    #mm_mutators = [normalized_numexpr_morph]
     # choose a random model
     f = random.choice(fmodels)
     originalmodel = f
@@ -43,7 +49,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
             # log function and arguments in that case
             mutators += [m]
             try:
-                cons += m(cons)  # apply a metamorphic mutation
+                 cons += m(cons)  # apply a metamorphic mutation
             except MetamorphicError as exc:
                 enb += 1
                 function, argument, e = exc.args
@@ -52,8 +58,6 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                     pickle.dump([function, argument, originalmodel, e], file=ff) # log function and arguments that caused exception
                 print('IE', end='', flush=True)
                 return False # no need to solve model we didn't modify..
-
-
         # enough mutations, time for solving
         try:
             model = cp.Model(cons)
@@ -68,16 +72,14 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                 return True
             else:
                 print('X', end='', flush=True)
-                print('morphs: ', mutators)
+                #print('morphs: ', mutators)
         except Exception as e:
             print('E', end='', flush=True)
-            print(e)
 
         # if you got here, the model failed...
         enb += 1
         with open("lasterrormodel" + str(enb)+".pickle", "wb") as f:
             pickle.dump([model, originalmodel, mutators], file=f)
-        #print(model)
         return False
 
 

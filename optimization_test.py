@@ -22,8 +22,16 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                    normalized_numexpr_morph,
                    reify_rewrite_morph,
                    only_bv_implies_morph,
+                   only_var_lhs_morph,
+                   only_const_rhs_morph,
+                   only_positive_bv_morph,
+                   flat2cnf_morph,
+                   toplevel_list_morph,
+                   decompose_globals_morph,
                    add_solution,
                    semanticFusion]
+    #mm_mutators = [aritmetic_comparison_morph]
+    #mm_mutators = [only_var_lhs_morph,only_const_rhs_morph,only_positive_bv_morph,flat2cnf_morph,toplevel_list_morph]
     # choose a random model
     f = random.choice(fmodels)
     originalmodel = f
@@ -59,6 +67,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                 with open(filename, "wb") as ff:
                     pickle.dump([function, argument, originalmodel, e], file=ff) # log function and arguments that caused exception
                 print('IE', end='', flush=True)
+                print(function)
                 return False # no need to solve model we didn't modify..
 
 
@@ -69,6 +78,7 @@ def metamorphic_test(dirname, solver, iters,fmodels,enb):
                 newModel.minimize(objective)
             else:
                 newModel.maximize(objective)
+
             sat = newModel.solve(solver=solver, time_limit=20)
             if newModel.status().runtime > 15:
                 # timeout, skip
@@ -102,7 +112,6 @@ if __name__ == '__main__':
     iters = 5 # number of metamorphic mutations per model
     sat = True
     enb = 0
-
 
     random.seed(0)
     while enb < 10:
