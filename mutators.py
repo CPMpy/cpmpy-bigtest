@@ -155,8 +155,9 @@ def linearize_constraint_morph(cons,linearize_all=False):
     else:
         n = random.randint(1, len(cons))
         randcons = random.choices(cons, k=n)
-    #only apply linearize after flattening
-    flatcons = flatten_morph(randcons, flatten_all=True)
+
+    #only apply linearize after only_bv_implies
+    flatcons = only_bv_implies_morph(randcons, morph_all=True)
     try:
         return linearize_constraint(flatcons)
     except Exception as e:
@@ -165,7 +166,7 @@ def linearize_constraint_morph(cons,linearize_all=False):
 def reify_rewrite_morph(cons):
     n = random.randint(1, len(cons))
     randcons = random.choices(cons, k=n)
-    #only apply linearize after flattening
+    cons = decompose_globals_morph(cons)
     flatcons = flatten_morph(randcons, flatten_all=True)
     try:
         return reify_rewrite(flatcons)
@@ -179,7 +180,6 @@ def only_bv_implies_morph(cons,morph_all=True):
     else:
         n = random.randint(1, len(cons))
         randcons = random.choices(cons, k=n)
-    #only apply linearize after flattening
     flatcons = flatten_morph(randcons, flatten_all=True)
     try:
         return only_bv_implies(flatcons)
